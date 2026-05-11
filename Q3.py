@@ -13,37 +13,35 @@ def main():
         session = Session()
 
         sql = """
-        SELECT
-        s_suppkey,
-        c_custkey,
-        count(1) AS value
-    FROM
-        customer,
-        orders,
-        lineitem,
-        supplier,
-        nation,
-        region
-    WHERE
-        c_custkey = o_custkey
-        AND l_orderkey = o_orderkey
-        AND l_suppkey = s_suppkey
-        AND c_nationkey = s_nationkey
-        AND s_nationkey = n_nationkey
-        AND n_regionkey = r_regionkey
-    GROUP BY
-        s_suppkey,
-        c_custkey
+        SELECT c_custkey, SUM(l_extendedprice * (1 - l_discount)) as value
+        FROM customer, orders, lineitem
+        WHERE c_mktsegment = 'BUILDING'
+          AND o_custkey = c_custkey
+          AND l_orderkey = o_orderkey
+          AND o.o_orderdate  < '1995-03-13'
+          AND l.l_shipdate   > '1995-03-13'
+        GROUP BY c_custkey;
         """
+
+        # SELECT c_custkey, count(1) as value
+        # FROM customer, orders, lineitem
+        # WHERE
+        #    o_custkey = c_custkey
+        #   AND l_orderkey = o_orderkey
+        #   and o_orderdate<date'1997-01-01' 
+        #     and l_shipdate>date'1994-01-01'
+        # GROUP BY c_custkey;
+
+         
 
         result = session.execute(text(sql))
         rows = result.all()
 
-        output_file = "query/count_query_output_q5.csv"
+        output_file = "query/sum_query_output_q3.csv"
         total_count = 0
         with open(output_file, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['s_suppkey', 'c_custkey', 'cnt'])
+            writer.writerow(['custom_id', 'cnt'])
             for row in rows:
                 writer.writerow(row)
                 total_count += row.value
