@@ -159,12 +159,9 @@ def readData2Db(engine, current_data_path):
             element_file_path = os.path.join(current_data_path, table_name + ".tbl")
             print(f"Processing: {element_file_path}")
 
-            if not os.path.exists(element_file_path):
-                print(f"Warning: File not found: {element_file_path}")
-                continue
-
             processed_content = io.StringIO()
             
+            #remove 无用的|
             with open(element_file_path, 'r', encoding='utf-8') as input_file:
                 for line in input_file:
                     clean_line = line.rstrip('\r\n').removesuffix('|')

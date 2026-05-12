@@ -75,35 +75,29 @@ if __name__ == "__main__":
         total_runs = 100 
         
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            # 拿到 100 次的原始结果列表：[(dp_res1, true_res), (dp_res2, true_res), ...]
             raw_results = list(executor.map(run_single_exp, [run_config] * total_runs))
         
-        # 真实结果其实每次跑都一样，随便取第一个就行
-        true_result_val = raw_results[0][1] 
+        original_result = raw_results[0][1] 
 
-        # 1. 在 main 里集中计算每次的绝对误差
-        # 把数据组装成: [(绝对误差, DP结果), (绝对误差, DP结果), ...]
         error_list = []
         for dp_res, true_res in raw_results:
             abs_err = abs(dp_res - true_res)
             error_list.append((abs_err, dp_res))
         
-        # 2. 按误差大小排序（按元组的第 0 个元素，即绝对误差排序）
+        # 按照误差排序
         error_list.sort(key=lambda x: x[0])
         
-        # 3. 截断极值（去掉头尾各 20 个）
-        trimmed_list = error_list[20:-20]
+        extract_list = error_list[20:-20]
 
-        # 4. 算平均绝对误差
-        abs_errors = [item[0] for item in trimmed_list]
+        # 绝对误差
+        abs_errors = [item[0] for item in extract_list]
         final_avg_abs_error = sum(abs_errors) / len(abs_errors)
         
-        # 5. 最后一步：拿平均绝对误差除以真实值，就是平均相对误差！
-        final_avg_rel_error = final_avg_abs_error / true_result_val if true_result_val != 0 else 0.0
-        
-        # 打印面板
-        print(f"\n--- 最终统计 (Scale: {scale}) ---")
-        print(f"真实总数: {true_result_val}")
-        print(f"有效误差样本数: {len(trimmed_list)}")
-        print(f"截断平均 绝对误差: {final_avg_abs_error:.2f}")
-        print(f"截断平均 相对误差: {final_avg_rel_error:.4%}\n")
+        # 相对误差
+        final_avg_rel_error = final_avg_abs_error / original_result 
+
+        print("Test scale: "+ scale)
+        print(f"Original Total: {original_result}")
+        print(f"Extract List: {len(extract_list)}")
+        print(f"Abs Error: {final_avg_abs_error:.2f}")
+        print(f"Relative Error: {final_avg_rel_error:.2%}\n")

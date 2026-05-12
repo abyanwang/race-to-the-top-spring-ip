@@ -114,13 +114,14 @@ def run_single_exp(config):
 
 
 if __name__ == "__main__":
-    scales = ["0.125", "0.25", "0.5", "1.0"]
+    gsq_config = [1e4, 1e5, 1e6, 1e7]
+    scale = "1.0"
     input_base_path = "./query/count_query_output_q5_scale_"
 
-    for scale in scales:
+    for gsq in gsq_config:
         tmp_path = input_base_path + scale + ".csv"
 
-        run_config = {'path': tmp_path, 'gsq': 1e6, 'beta': 0.1, 'eps': 0.8}
+        run_config = {'path': tmp_path, 'gsq': gsq, 'beta': 0.1, 'eps': 0.8}
         
         total_runs = 100
         
@@ -147,7 +148,7 @@ if __name__ == "__main__":
         #relative error
         final_avg_rel_error = final_avg_abs_error / original_result
         
-        print("Test scale: "+ scale)
+        print(f"Test GSq: {gsq}")
         print(f"Original Total: {original_result}")
         print(f"Extract List: {len(report_list)}")
         print(f"Abs Error: {final_avg_abs_error:.2f}")
