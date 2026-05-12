@@ -1,9 +1,6 @@
 import os
 import io
-
 import sys
-# /Library/PostgreSQL/15/scripts/runpsql.sh; exit
-#CREATE DATABASE tpch_scale_10 建一个database
 
 import sqlalchemy
 from sqlalchemy import (
@@ -12,23 +9,38 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine import reflection
+from dotenv import load_dotenv
 
 Base = declarative_base()
-engine = None  
-Session = None
 
-database_name = 'tpch_scale_10'
-dataset = ''
-data_path = '/Users/free/Projects/ipdata1.0/'
+config = {
+    "0.125":{
+        "database_name":'tpch_scale_0125',
+        "data_path":"/Users/free/Projects/ipdata0.125"
+    },
+    "0.25":{
+        "database_name":'tpch_scale_025',
+        "data_path":"/Users/free/Projects/ipdata0.25"
+    },
+    "0.5":{
+        "database_name":'tpch_scale_050',
+        "data_path":"/Users/free/Projects/ipdata0.5"
+    },
+    "1.0":{
+        "database_name":'tpch_scale_10',
+        "data_path":"/Users/free/Projects/ipdata1.0"
+    }
+}
+
 relations = ["REGION", "NATION", "SUPPLIER", "CUSTOMER", "ORDERS", "LINEITEM"]
 
-
+load_dotenv()
 db_user = "postgres"
-db_password = "peng!free"
+db_password = os.getenv("db_password")
 db_host = "localhost"
 db_port = "5432"
 
-# define DDL
+
 class Region(Base):
     __tablename__ = 'region'
     
@@ -43,7 +55,7 @@ class Region(Base):
 
 class Nation(Base):
     __tablename__ = 'nation'
-    n_nationkey = Column(Integer, nullable=False, primary_key=True)  # 原始主键
+    n_nationkey = Column(Integer, nullable=False, primary_key=True)  
     n_name = Column(String(25), nullable=False)
     n_regionkey = Column(Integer, nullable=False)
     n_comment = Column(String(152))
@@ -55,7 +67,7 @@ class Nation(Base):
 
 class Supplier(Base):
     __tablename__ = 'supplier'
-    s_suppkey = Column(Integer, nullable=False, primary_key=True)  # 原始主键
+    s_suppkey = Column(Integer, nullable=False, primary_key=True)  
     s_name = Column(String(25), nullable=False)
     s_address = Column(String(40), nullable=False)
     s_nationkey = Column(Integer, nullable=False)
@@ -70,7 +82,7 @@ class Supplier(Base):
 
 class Customer(Base):
     __tablename__ = 'customer'
-    c_custkey = Column(Integer, nullable=False, primary_key=True)  # 原始主键
+    c_custkey = Column(Integer, nullable=False, primary_key=True)  
     c_name = Column(String(25), nullable=False)
     c_address = Column(String(40), nullable=False)
     c_nationkey = Column(Integer, nullable=False)
@@ -79,7 +91,6 @@ class Customer(Base):
     c_mktsegment = Column(String(10), nullable=False)
     c_comment = Column(String(117), nullable=False)
 
-    
     __table_args__ = (
         Index('c_i', 'c_custkey'),
     )
@@ -88,7 +99,7 @@ class Customer(Base):
 class Orders(Base):
     __tablename__ = 'orders'
 
-    o_orderkey = Column(Integer, nullable=False, primary_key=True)  # 原始主键
+    o_orderkey = Column(Integer, nullable=False, primary_key=True)  
     o_custkey = Column(Integer, nullable=False)
     o_orderstatus = Column(String(1), nullable=False)
     o_totalprice = Column(DECIMAL(15, 2), nullable=False)
@@ -123,26 +134,37 @@ class LineItem(Base):
     l_comment = Column(String(44), nullable=False)
 
     __table_args__ = (
-        # Index('l_i', 'l_partkey', 'l_suppkey'),
-        
         PrimaryKeyConstraint('l_orderkey', 'l_linenumber'),
     )
 
-def readData2Db():
+
+
+def create_table(db_name):
+    db_url = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    
+    engine = create_engine(db_url, echo=False)
+
+    Base.metadata.drop_all(engine)
+    
+    Base.metadata.create_all(engine)
+    
+    return engine
+
+def readData2Db(engine, current_data_path):
     conn = engine.raw_connection()
     try:
         cur = conn.cursor()
         for element in relations:
             table_name = element.lower()
-            element_file_path = os.path.join(data_path, table_name + ".tbl")
-            print(element_file_path)
+            element_file_path = os.path.join(current_data_path, table_name + ".tbl")
+            print(f"Processing: {element_file_path}")
 
             if not os.path.exists(element_file_path):
                 print(f"Warning: File not found: {element_file_path}")
                 continue
 
             processed_content = io.StringIO()
-            #末尾有|，会报错需要清理
+            
             with open(element_file_path, 'r', encoding='utf-8') as input_file:
                 for line in input_file:
                     clean_line = line.rstrip('\r\n').removesuffix('|')
@@ -154,32 +176,23 @@ def readData2Db():
             print(f"Successfully loaded {table_name}!")
 
         conn.commit()
-        print("Data import completed successfully!")
     except Exception as e:
-        print("Load Error" + e)
         conn.rollback()
     finally:
         conn.close()
 
-def create_table():
-    global engine, Session
-
-    
-    db_url = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{database_name}"
-
-    print(f"Connecting to database with URL: {db_url}")
-    engine = create_engine(db_url, echo=False)
-    #Base.metadata.drop_all(engine)  
-
-    Base.metadata.create_all(engine)
-    print("Database tables created successfully!")
-    Session = sessionmaker(bind=engine)
 
 def main():
-    global database_name, dataset, db_user, db_password, db_host, db_port
-
-    create_table()
-    readData2Db()
+    for scale, settings in config.items():
+        db_name = settings["database_name"]
+        current_data_path = settings["data_path"]
+                
+        engine = create_table(db_name)
+        
+        readData2Db(engine, current_data_path)
+        
+        engine.dispose()
+        
 
 if __name__ == "__main__":
     main()

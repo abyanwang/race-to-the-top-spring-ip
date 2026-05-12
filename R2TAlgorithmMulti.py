@@ -44,8 +44,7 @@ class R2TAlgorithm:
                 self.k_cj_I[pid].append(k)
     
     def naive_tau(self, tau):
-        
-        return self.dataframe['cnt'].map(lambda x : min(x, tau))
+        return self.dataframe['cnt'].map(lambda x : min(x, tau)).sum()
 
     def load_csv_multi(self, input_file_path):
         dataframe = pd.read_csv(input_file_path)
@@ -106,33 +105,71 @@ class R2TAlgorithm:
 
 
 def run_single_exp(config):
-    
     al = R2TAlgorithm(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="multi")
     al.load_csv_multi(config['path'])
     al.id_2_uk_list()
     best_tau, result = al.race_to_the_top()
     
-    # 仅计算并返回误差
-    rel_error = abs(result - al.result) / al.result if al.result != 0 else 0.0
-    print("exp: "+rel_error)
-    return rel_error
+    # Just return the DP result and the true result
+    return result, al.result
 
 
 if __name__ == "__main__":
-    input_path = "./query/count_query_output_q5.csv"
-
-    config = {'path': input_path, 'gsq': 1e6, 'beta': 0.1, 'eps': 0.8}
-    total_runs = 1 
-
     
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results = executor.map(run_single_exp, [config] * total_runs)
-        errors = list(results)
+    # Define the config for different scales if you have them, 
+    # similar to the previous script. If not, here is a single run configuration.
     
-    errors.sort()
-    errors = errors[0:1]
+    scales = ["0.125", "0.25", "0.5", "1.0"]
+    input_base_path = "./query/count_query_output_q5_scale_"
 
-    final_avg_error = sum(errors) / len(errors)
+    for scale in scales:
+        tmp_path = input_base_path + scale + ".csv"
+        
+        # Check if the file exists before trying to run the experiment
+        if not os.path.exists(tmp_path):
+            print(f"File not found: {tmp_path}. Skipping scale {scale}.")
+            continue
 
-    print(len(errors))
-    print(final_avg_error)
+        run_config = {'path': tmp_path, 'gsq': 1e6, 'beta': 0.1, 'eps': 0.8}
+        
+        # Adjust total_runs as needed. 1 is good for testing, but you'll want more (e.g., 100) for real results.
+        total_runs = 20 
+        
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            # Map returns an iterator of results from run_single_exp
+            raw_results = list(executor.map(run_single_exp, [run_config] * total_runs))
+        
+        if not raw_results:
+            continue
+
+        true_result_val = raw_results[0][1] 
+
+        # 1. Calculate absolute error for each run
+        error_list = []
+        for dp_res, true_res in raw_results:
+            abs_err = abs(dp_res - true_res)
+            error_list.append((abs_err, dp_res))
+        
+        # 2. Sort by absolute error
+        error_list.sort(key=lambda x: x[0])
+        
+        # 3. Trim extremes. Adjust the slice indices based on total_runs.
+        # For a small number of runs like 5, don't trim. For 100 runs, use [20:-20].
+        if total_runs >= 40:
+            trim_amount = int(total_runs * 0.2)
+            trimmed_list = error_list[trim_amount:-trim_amount]
+        else:
+            trimmed_list = error_list
+
+        # 4. Calculate average absolute error
+        abs_errors = [item[0] for item in trimmed_list]
+        final_avg_abs_error = sum(abs_errors) / len(abs_errors) if abs_errors else 0.0
+        
+        # 5. Calculate average relative error
+        final_avg_rel_error = final_avg_abs_error / true_result_val if true_result_val != 0 else 0.0
+        
+        print(f"\n--- Final Statistics (Scale: {scale}) ---")
+        print(f"True Total: {true_result_val}")
+        print(f"Valid Error Samples: {len(trimmed_list)}")
+        print(f"Trimmed Average Absolute Error: {final_avg_abs_error:.2f}")
+        print(f"Trimmed Average Relative Error: {final_avg_rel_error:.4%}\n")
