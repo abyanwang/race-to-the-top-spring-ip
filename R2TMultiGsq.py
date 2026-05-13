@@ -29,8 +29,9 @@ class R2TAlgorithm:
                 current_id += 1
             return id_map[entity]
 
-        df['id1'] = df['s_suppkey'].apply(map_id)
-        df['id2'] = df['c_custkey'].apply(map_id)
+        df['id1'] = df['s_suppkey'].apply(lambda x : f"s_{x}").apply(map_id)
+        df['id2'] = df['c_custkey'].apply(lambda x : f"c_{x}").apply(map_id)
+
 
     def id_2_uk_list(self):
         self.k_cj_I = defaultdict(list)
