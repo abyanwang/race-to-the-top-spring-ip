@@ -36,13 +36,14 @@ def execute_and_export(scale, db_name):
 
         
 
-        sql = """SELECT c_custkey, count(1) as value
-        FROM customer, orders, lineitem
-        WHERE o_custkey = c_custkey
-          AND l_orderkey = o_orderkey
-          AND o_orderdate < '1995-03-15'
-          AND l_shipdate > '1995-03-15'
-        GROUP BY c_custkey;
+        sql = """SELECT  c_custkey
+                ,COUNT(1) AS value
+            FROM customer, orders, lineitem
+            WHERE c_custkey = o_custkey
+            AND l_orderkey = o_orderkey
+            AND o_orderdate < '1995-03-15'
+            AND l_shipdate > '1995-03-15'
+            GROUP BY  c_custkey
         """
 
         print(f"Querying database: {db_name} (Scale: {scale})")
