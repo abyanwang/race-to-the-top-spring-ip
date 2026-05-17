@@ -7,21 +7,28 @@ from collections import defaultdict
 import concurrent.futures
 
 from database import config
+from R2TAlgorithmMulti import R2TAlgorithm
 
-class R2TAlgorithm:
+class R2TAlgorithmSingle(R2TAlgorithm):
     def __init__(self, input_file_path, gsq, beta, epsilon, type_):
-        self.input_file_path = input_file_path
-        self.global_sen = gsq
-        self.beta = beta
-        self.epsilon = epsilon
-        self.type = type_
+        super().__init__(input_file_path, gsq, beta, epsilon, type_)
 
-        self.result = 0.0
-        self.dataframe = None
-        self.k_cj_I = None
+    def id_2_uk_list(self):
+        self.k_cj_I = defaultdict(list)
+
+        id1_list = self.dataframe['custom_id'].values
+
+        #k是index self.dataframe是join result
+        for k in range(len(self.dataframe)):
+            involved_ids = {id1_list[k]}
+            for tupleid in involved_ids:
+                self.k_cj_I[tupleid].append(k)
+
+    # 简化，等价于每一个group by后的结果 和 tau比较
+    def Q_I_tau_lp(self, tau):
+        cnt = self.dataframe['cnt'].to_numpy()
+        return float(np.sum(np.minimum(cnt, tau)))
     
-    def naive_tau(self, tau):
-        return self.dataframe['cnt'].map(lambda x : min(x, tau)).sum()
     
     def load_csv_single(self, input_file_path):
         dataframe = pd.read_csv(input_file_path)
@@ -29,45 +36,18 @@ class R2TAlgorithm:
         self.result = dataframe['cnt'].sum()
         self.dataframe = dataframe
 
-    def race_to_the_top(self):
-        base = 2
-
-        log_gsq = math.ceil(math.log(self.global_sen, base))
-        if log_gsq < 0:
-            log_gsq = 0
-
-        max_res1 = -math.inf
-        best_tau = -1
-
-        for i in range(1, log_gsq + 1):
-            tau = math.pow(base, i)
-            
-            q_tau = self.naive_tau(tau)
-            
-            noise_scale = log_gsq * tau / self.epsilon
-            noise = np.random.laplace(loc=0.0, scale=noise_scale)
-            
-            penalty = log_gsq * math.log(log_gsq / self.beta) * (tau / self.epsilon)
-            
-            t_res2 = q_tau + noise - penalty
-
-            if t_res2 > max_res1:
-                max_res1 = t_res2
-                best_tau = tau
-
-        return best_tau, max(0, max_res1)
-
 
 def run_single_exp(config):
-    al = R2TAlgorithm(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="multi")
+    al = R2TAlgorithmSingle(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="single")
     al.load_csv_single(config['path'])
+    al.id_2_uk_list()
     best_tau, result = al.race_to_the_top()
     
     return result, al.result
 
 
 if __name__ == "__main__":
-    input_path = "./query/sum_query_output_q3_scale_"
+    input_path = "./query/count_query_output_q3_scale_"
 
     for scale, settings in config.items():
         tmp_path =  input_path + scale + ".csv"

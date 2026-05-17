@@ -38,13 +38,12 @@ class R2TAlgorithm:
         id1_list = self.dataframe['id1'].values
         id2_list = self.dataframe['id2'].values
 
+        #k是index self.dataframe是join result
         for k in range(len(self.dataframe)):
+            #tji 2个id tuple id
             involved_ids = {id1_list[k], id2_list[k]}
-            for pid in involved_ids:
-                self.k_cj_I[pid].append(k)
-    
-    def naive_tau(self, tau):
-        return self.dataframe['cnt'].map(lambda x : min(x, tau)).sum()
+            for tupleid in involved_ids:
+                self.k_cj_I[tupleid].append(k)
 
     def load_csv_multi(self, input_file_path):
         dataframe = pd.read_csv(input_file_path)
@@ -63,8 +62,18 @@ class R2TAlgorithm:
         uk = mdl.continuous_var_list(len(self.dataframe), lb=0, ub=q_k, name='u')
 
         #tau 约束
-        for pid, indices in self.k_cj_I.items():
-            mdl.add_constraint(mdl.sum_vars(uk[k] for k in indices) <= tau)
+        #对每一个join result
+        # cjI是 𝐶𝑗 (I) := {𝑘 : 𝑞𝑘 (I) references 𝑡𝑗 (I)}.
+        #𝑡𝑗 (I)是tuple 𝑞𝑘 (I)是join result，k是index
+        #indices 是那个index k 集合
+        #遍历的是|I(𝑅𝑃 )| 就是原本保护的entity
+        # for _, indices in self.k_cj_I.items():
+        #     mdl.add_constraint(mdl.sum_vars(uk[k] for k in indices) <= tau)
+        constraints = [
+            mdl.sum_vars(uk[k] for k in indices) <= tau
+            for indices in self.k_cj_I.values()
+        ]
+        mdl.add_constraints(constraints)
 
         mdl.maximize(mdl.sum(uk))
 
@@ -78,11 +87,11 @@ class R2TAlgorithm:
     def race_to_the_top(self):
         base = 2
 
-        log_gsq = math.ceil(math.log(self.global_sen, base))
+        log_gsq = int(math.log(self.global_sen, base))
         if log_gsq < 0:
             log_gsq = 0
 
-        max_res1 = -math.inf
+        max_res = -math.inf
         best_tau = -1
 
         for i in range(1, log_gsq + 1):
@@ -95,13 +104,13 @@ class R2TAlgorithm:
             
             penalty = log_gsq * math.log(log_gsq / self.beta) * (tau / self.epsilon)
             
-            t_res2 = q_tau + noise - penalty
+            t_res = q_tau + noise - penalty
 
-            if t_res2 > max_res1:
-                max_res1 = t_res2
+            if t_res > max_res:
+                max_res = t_res
                 best_tau = tau
 
-        return best_tau, max(0, max_res1)
+        return best_tau, max_res
 
 
 def run_single_exp(config):

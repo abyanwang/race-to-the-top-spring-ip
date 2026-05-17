@@ -46,6 +46,32 @@ def execute_and_export(scale, db_name):
             c_custkey
         """
 
+        # sql = """
+        # SELECT
+        #     s_suppkey,
+        #     c_custkey,
+        #     sum(l_extendedprice*(1-l_discount)) AS value
+        # FROM
+        #     customer,
+        #     orders,
+        #     lineitem,
+        #     supplier,
+        #     nation,
+        #     region
+        # WHERE
+        #     c_custkey = o_custkey
+        #     AND l_orderkey = o_orderkey
+        #     AND l_suppkey = s_suppkey
+        #     AND c_nationkey = s_nationkey
+        #     AND s_nationkey = n_nationkey
+        #     AND n_regionkey = r_regionkey
+        #     AND o_orderdate >= date '1994-01-01'
+        #     AND o_orderdate < date '1994-01-01' + interval '1' year
+        # GROUP BY
+        #     s_suppkey,
+        #     c_custkey
+        # """
+
         print(f"Querying database: {db_name} (Scale: {scale})...")
         result = session.execute(text(sql))
         rows = result.all()

@@ -46,11 +46,21 @@ def execute_and_export(scale, db_name):
             GROUP BY  c_custkey
         """
 
+        # sql = """SELECT  c_custkey
+        #         ,sum(l_extendedprice*(1-l_discount)) AS value
+        #     FROM customer, orders, lineitem
+        #     WHERE c_custkey = o_custkey
+        #     AND l_orderkey = o_orderkey
+        #     AND o_orderdate < '1995-03-15'
+        #     AND l_shipdate > '1995-03-15'
+        #     GROUP BY  c_custkey
+        # """
+
         print(f"Querying database: {db_name} (Scale: {scale})")
         result = session.execute(text(sql))
         rows = result.all()
 
-        output_file = f"query/sum_query_output_q3_scale_{scale}.csv"
+        output_file = f"query/count_query_output_q3_scale_{scale}.csv"
         
         total_count = 0
         with open(output_file, 'w', newline='', encoding='utf-8') as f:
