@@ -5,6 +5,8 @@ import pandas as pd
 from docplex.mp.model import Model
 from collections import defaultdict
 import concurrent.futures
+import hashlib
+
 
 class R2TAlgorithm:
     def __init__(self, input_file_path, gsq, beta, epsilon, type_):
@@ -38,9 +40,7 @@ class R2TAlgorithm:
         id1_list = self.dataframe['id1'].values
         id2_list = self.dataframe['id2'].values
 
-        #k是index self.dataframe是join result
         for k in range(len(self.dataframe)):
-            #tji 2个id tuple id
             involved_ids = {id1_list[k], id2_list[k]}
             for tupleid in involved_ids:
                 self.k_cj_I[tupleid].append(k)
@@ -69,11 +69,19 @@ class R2TAlgorithm:
         #遍历的是|I(𝑅𝑃 )| 就是原本保护的entity
         # for _, indices in self.k_cj_I.items():
         #     mdl.add_constraint(mdl.sum_vars(uk[k] for k in indices) <= tau)
+        max_value = 0.0
+        for indices in self.k_cj_I.values():
+            max_value = max(max_value, sum(q_k[k] for k in indices))
+        
+        if (tau >= max_value):
+            return self.result
+
         constraints = [
             mdl.sum_vars(uk[k] for k in indices) <= tau
             for indices in self.k_cj_I.values()
         ]
         mdl.add_constraints(constraints)
+
 
         mdl.maximize(mdl.sum(uk))
 
@@ -85,23 +93,28 @@ class R2TAlgorithm:
             raise RuntimeError("calculate error")
 
     def race_to_the_top(self):
+        #根据论文base是2
         base = 2
-
-        log_gsq = int(math.log(self.global_sen, base))
-        if log_gsq < 0:
-            log_gsq = 0
+        # log_gsq_base = math.log2(self.global_sen)
+        #log has base 2 and ln has base 𝑒
+        log_gsq = int(math.log2(self.global_sen))
 
         max_res = -math.inf
         best_tau = -1
 
-        for i in range(1, log_gsq + 1):
-            tau = math.pow(base, i)
-            
+        # 生成tau 𝜏(𝑗) =2𝑗,𝑗=1,...,log(𝐺𝑆𝑄)
+        taus = [math.pow(base, i) 
+                for i in range(1, log_gsq + 1)]
+
+        for tau in taus:            
+            #term1
             q_tau = self.Q_I_tau_lp(tau)
             
+            #term2
             noise_scale = log_gsq * tau / self.epsilon
             noise = np.random.laplace(loc=0.0, scale=noise_scale)
             
+            #term3
             penalty = log_gsq * math.log(log_gsq / self.beta) * (tau / self.epsilon)
             
             t_res = q_tau + noise - penalty
@@ -113,13 +126,28 @@ class R2TAlgorithm:
         return best_tau, max_res
 
 
-def run_single_exp(config):
-    al = R2TAlgorithm(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="multi")
-    al.load_csv_multi(config['path'])
+def run_single_exp(run_config):
+    if run_config['seed'] is not None:
+        np.random.seed(run_config['seed'])
+        # print(run_config['seed'])
+
+    al = R2TAlgorithm(run_config['path'], gsq=run_config['gsq'], beta=run_config['beta'], epsilon=run_config['eps'], type_="multi")
+    al.load_csv_multi(run_config['path'])
     al.id_2_uk_list()
     best_tau, result = al.race_to_the_top()
     
     return result, al.result
+
+def get_seeds_run_config(run_config, total_runs):
+    seeds = [
+            int(hashlib.md5(
+                f"{run_config['path']}|{run_config['eps']}|{run_config['gsq']}|{i}".encode()
+            ).hexdigest(), 16) % (9999)
+            for i in range(total_runs)
+        ]
+
+    run_configs = [{**run_config, 'seed': s} for s in seeds]
+    return run_configs
 
 
 if __name__ == "__main__":
@@ -130,11 +158,12 @@ if __name__ == "__main__":
         tmp_path = input_base_path + scale + ".csv"
 
         run_config = {'path': tmp_path, 'gsq': 1e6, 'beta': 0.1, 'eps': 0.8}
-        
         total_runs = 100
+
+        run_configs = get_seeds_run_config(run_config, total_runs)
         
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            raw_results = list(executor.map(run_single_exp, [run_config] * total_runs))
+            raw_results = list(executor.map(run_single_exp, run_configs))
         
         if not raw_results:
             continue

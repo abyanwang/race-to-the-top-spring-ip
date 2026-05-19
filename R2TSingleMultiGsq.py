@@ -7,17 +7,18 @@ from collections import defaultdict
 import concurrent.futures
 
 from database import config
-from R2TAlgorithmSingle import R2TAlgorithmSingle 
+from R2TAlgorithmSingle import R2TAlgorithmSingle,run_single_exp_single
+from R2TAlgorithmMulti import get_seeds_run_config
 
 
-def run_single_exp(config):
-    al = R2TAlgorithmSingle(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="single")
-    al.load_csv_single(config['path'])
-    al.id_2_uk_list()
-    best_tau, result = al.race_to_the_top()
-    # print(best_tau)
+# def run_single_exp(config):
+#     al = R2TAlgorithmSingle(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="single")
+#     al.load_csv_single(config['path'])
+#     al.id_2_uk_list()
+#     best_tau, result = al.race_to_the_top()
+#     # print(best_tau)
     
-    return result, al.result
+#     return result, al.result
 
 
 if __name__ == "__main__":
@@ -30,9 +31,11 @@ if __name__ == "__main__":
         tmp_path =  input_path + scale + ".csv"
         run_config = {'path': tmp_path, 'gsq': gsq, 'beta': 0.1, 'eps': 0.8}
         total_runs = 100 
+
+        run_configs = get_seeds_run_config(run_config, total_runs)
         
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            raw_results = list(executor.map(run_single_exp, [run_config] * total_runs))
+            raw_results = list(executor.map(run_single_exp_single, run_configs))
         
         original_result = raw_results[0][1] 
 

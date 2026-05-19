@@ -174,6 +174,7 @@ def readData2Db(engine, current_data_path):
 
         conn.commit()
     except Exception as e:
+        print(f"Failed to load {table_name}: {e}")
         conn.rollback()
     finally:
         conn.close()

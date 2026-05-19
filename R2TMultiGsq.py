@@ -5,17 +5,18 @@ import pandas as pd
 from docplex.mp.model import Model
 from collections import defaultdict
 import concurrent.futures
+import hashlib
 
-from R2TAlgorithmMulti import R2TAlgorithm
+from R2TAlgorithmMulti import R2TAlgorithm,run_single_exp,get_seeds_run_config
 
 
-def run_single_exp(config):
-    al = R2TAlgorithm(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="multi")
-    al.load_csv_multi(config['path'])
-    al.id_2_uk_list()
-    best_tau, result = al.race_to_the_top()
+# def run_single_exp(config):
+#     al = R2TAlgorithm(config['path'], gsq=config['gsq'], beta=config['beta'], epsilon=config['eps'], type_="multi")
+#     al.load_csv_multi(config['path'])
+#     al.id_2_uk_list()
+#     best_tau, result = al.race_to_the_top()
     
-    return result, al.result
+#     return result, al.result
 
 
 if __name__ == "__main__":
@@ -29,9 +30,12 @@ if __name__ == "__main__":
         run_config = {'path': tmp_path, 'gsq': gsq, 'beta': 0.1, 'eps': 0.8}
         
         total_runs = 100
+    
+
+        run_configs = get_seeds_run_config(run_config=run_config, total_runs=total_runs)
         
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            raw_results = list(executor.map(run_single_exp, [run_config] * total_runs))
+            raw_results = list(executor.map(run_single_exp, run_configs))
         
         if not raw_results:
             continue
