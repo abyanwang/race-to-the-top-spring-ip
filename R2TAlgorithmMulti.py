@@ -97,7 +97,8 @@ class R2TAlgorithm:
         base = 2
         # log_gsq_base = math.log2(self.global_sen)
         #log has base 2 and ln has base 𝑒
-        log_gsq = int(math.log2(self.global_sen))
+        # log_gsq = math.ceil(math.log(self.global_sen, base))
+        log_gsq = int(math.log(self.global_sen, base))
 
         max_res = -math.inf
         best_tau = -1
